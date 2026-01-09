@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pattern Match: Sequence Mode</title>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+        :root {
+            --bg-color: #f5f5f7;
+            --primary: #1E88E5;
+            --danger: #E53935;
+            --success: #43A047;
+            --text: #333;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* 타이머바 */
+        #round-timer-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 100;
+        }
+        #round-progress {
+            width: 100%;
+            height: 100%;
+            background: var(--success);
+            transition: width 1s linear;
+        }
+
+        header {
+            margin-top: 24px;
+            text-align: center;
+            width: 100%;
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; color: #444; font-weight: 700; }
+        .info-text { font-size: 0.8rem; color: #666; margin-top: 4px; min-height: 1.2em;}
+        .highlight { color: var(--danger); font-weight: bold; }
+        
+        .difficulty-btn-group {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+        
+        button {
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            background: #ddd;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button.active {
+            background: #333;
+            color: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transform: scale(1.05);
+        }
+
+        #game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 450px;
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        canvas {
+            border-radius: 12px;
+            touch-action: none;
+        }
+
+        #grid-canvas {
+            background: white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+
+        #target-area {
+            background: rgba(255,255,255,0.7);
+            padding: 15px;
+            border-radius: 16px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+        }
+
+        #combo-timer-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: var(--danger);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        
+        .label-group {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        .label { font-size: 0.85rem; color: #666; font-weight: 600; }
+        .combo-text { font-size: 0.85rem; color: var(--danger); font-weight: 800; display: none; }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+        .shake { animation: shake 0.3s; }
+
+    </style>
+</head>
+<body>
+
+    <div id="round-timer-bar"><div id="round-progress"></div></div>
+
+    <header>
+        <h1>Pattern Match</h1>
+        <div class="info-text" id="rule-display"></div>
+        <div class="difficulty-btn-group">
+            <button onclick="setDifficulty(3)" id="btn-3">3x3</button>
+            <button onclick="setDifficulty(4)" id="btn-4">4x4</button>
+            <button onclick="setDifficulty(5)" id="btn-5">5x5</button>
+        </div>
+    </header>
+
+    <div id="game-container">
+        <canvas id="grid-canvas"></canvas>
+        
+        <div id="target-area">
+            <div class="label-group">
+                <span class="label">Target</span>
+                <span class="combo-text" id="combo-alert">⚡ 5초 안에 완료!</span>
+            </div>
+            <canvas id="target-canvas"></canvas>
+            <div id="combo-timer-overlay"></div>
+        </div>
+    </div>
+
+<script>
+    // --- 설정 및 데이터 ---
+    const COLORS = ["#E53935", "#1E88E5", "#43A047", "#FDD835", "#424242"];
+    const DIRECTIONS = [0, 90, 180, 270]; 
+    const SHAPE_COUNT = 14; 
+
+    // 게임 상태 변수
+    let currentGridSize = 3;
+    let tiles = [];
+    let targets = [];
+    let selectedIndices = []; // 사용자가 클릭한 타일 인덱스 저장
+    
+    // 순서 관련 변수 (New)
+    let targetOrder = []; // 4x4, 5x5에서 클릭해야 할 타겟 인덱스 순서 (0,1,2 등)
+    let currentStep = 0;  // 현재 몇 번째 순서를 맞추고 있는지 (0 ~ 2)
+
+    // 타이머 변수
+    let roundTimeLimit = 60;
+    let roundTimeLeft = 60;
+    let roundTimerId = null;
+
+    let comboTimeLimit = 5000;
+    let comboStartTime = 0;
+    let comboTimerId = null;
+    let isComboActive = false;
+
+    const gridCanvas = document.getElementById('grid-canvas');
+    const targetCanvas = document.getElementById('target-canvas');
+    const gCtx = gridCanvas.getContext('2d');
+    const tCtx = targetCanvas.getContext('2d');
+    
+    const roundProgressBar = document.getElementById('round-progress');
+    const comboProgressBar = document.getElementById('combo-timer-overlay');
+    const comboAlert = document.getElementById('combo-alert');
+    const ruleDisplay = document.getElementById('rule-display');
+
+    // --- 그리기 함수 ---
+    function drawShape(ctx, shapeIdx, x, y, size, color, direction) {
+        ctx.save();
+        ctx.translate(x, y);
+        const r = size / 2;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        // 도형 그리기 (기존 로직)
+        switch(shapeIdx) {
+            case 0: ctx.rect(-r, -r, size, size); break;
+            case 1: ctx.roundRect(-r, -r, size, size, size * 0.2); break;
+            case 2: { const c = r * 0.4; ctx.moveTo(-r + c, -r); ctx.lineTo(r - c, -r); ctx.lineTo(r, -r + c); ctx.lineTo(r, r - c); ctx.lineTo(r - c, r); ctx.lineTo(-r + c, r); ctx.lineTo(-r, r - c); ctx.lineTo(-r, -r + c); } break;
+            case 3: drawPolygon(ctx, 0, 0, r, 5); break;
+            case 4: drawPolygon(ctx, 0, 0, r, 6); break;
+            case 5: drawPolygon(ctx, 0, 0, r, 8); break;
+            case 6: drawPolygon(ctx, 0, 0, r, 10); break;
+            case 7: ctx.arc(0, 0, r, 0, Math.PI * 2); break;
+            case 8: drawStar(ctx, 0, 0, 8, r, r * 0.7); break;
+            case 9: drawStar(ctx, 0, 0, 12, r, r * 0.8); break;
+            case 10: drawStar(ctx, 0, 0, 16, r, r * 0.75); break;
+            case 11: drawStar(ctx, 0, 0, 5, r, r * 0.5); break;
+            case 12: drawStar(ctx, 0, 0, 6, r, r * 0.55); break;
+            case 13: drawStar(ctx, 0, 0, 8, r, r * 0.45); break;
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // 방향키
+        ctx.rotate(direction * Math.PI / 180);
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        const aS = size * 0.18;
+        ctx.moveTo(0, -aS);
+        ctx.lineTo(aS * 0.866, aS * 0.5);
+        ctx.lineTo(-aS * 0.866, aS * 0.5);
+        ctx.fill();
+        ctx.restore();
+    }
+    function drawPolygon(ctx,x,y,r,s){ctx.moveTo(x+r*Math.cos(-Math.PI/2),y+r*Math.sin(-Math.PI/2));for(let i=1;i<=s;i++)ctx.lineTo(x+r*Math.cos(i*2*Math.PI/s-Math.PI/2),y+r*Math.sin(i*2*Math.PI/s-Math.PI/2));}
+    function drawStar(ctx,cx,cy,s,o,i){let r=Math.PI/2*3,x=cx,y=cy,st=Math.PI/s;ctx.moveTo(cx,cy-o);for(let k=0;k<s;k++){x=cx+Math.cos(r)*o;y=cy+Math.sin(r)*o;ctx.lineTo(x,y);r+=st;x=cx+Math.cos(r)*i;y=cy+Math.sin(r)*i;ctx.lineTo(x,y);r+=st;}ctx.lineTo(cx,cy-o);}
+
+    // 번호 뱃지 그리기 (순서 표시용)
+    function drawBadge(ctx, x, y, number) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = "#E53935"; // Red Badge
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "white";
+        ctx.font = "bold 12px Pretendard";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(number, 0, 1);
+        ctx.restore();
+    }
+
+    class Tile {
+        constructor(s, c, d) {
+            this.shape = s; this.color = c; this.dir = d;
+            this.id = `${s}-${c}-${d}`;
+        }
+    }
+
+    // --- 타이머 함수들 (기존 동일) ---
+    function startRoundTimer() {
+        stopRoundTimer();
+        roundTimeLeft = roundTimeLimit;
+        updateRoundBar();
+        roundTimerId = setInterval(() => {
+            roundTimeLeft--;
+            updateRoundBar();
+            if(roundTimeLeft <= 0) {
+                stopRoundTimer(); stopComboTimer();
+                alert("⏰ 시간 초과! (Time Over)");
+                generateLevel();
+            }
+        }, 1000);
+    }
+    function stopRoundTimer() { if(roundTimerId) clearInterval(roundTimerId); }
+    function updateRoundBar() {
+        const pct = (roundTimeLeft / roundTimeLimit) * 100;
+        roundProgressBar.style.width = `${pct}%`;
+        roundProgressBar.style.background = pct > 50 ? "#43A047" : (pct > 20 ? "#FB8C00" : "#E53935");
+    }
+    function startComboTimer() {
+        if(isComboActive) return;
+        isComboActive = true;
+        comboStartTime = Date.now();
+        comboAlert.style.display = "block"; 
+        comboTimerId = setInterval(() => {
+            const elapsed = Date.now() - comboStartTime;
+            const remaining = comboTimeLimit - elapsed;
+            const pct = (remaining / comboTimeLimit) * 100;
+            comboProgressBar.style.width = `${pct}%`;
+            if(remaining <= 0) failCombo();
+        }, 50);
+    }
+    function stopComboTimer() {
+        isComboActive = false;
+        clearInterval(comboTimerId);
+        comboProgressBar.style.width = "0%";
+        comboAlert.style.display = "none";
+    }
+    function failCombo() {
+        stopComboTimer();
+        gridCanvas.classList.add('shake');
+        setTimeout(() => gridCanvas.classList.remove('shake'), 500);
+        selectedIndices = [];
+        currentStep = 0; // 순서도 초기화
+        drawGrid();
+        if(navigator.vibrate) navigator.vibrate(200);
+    }
+
+    // --- 게임 로직 ---
+
+    function generateLevel() {
+        stopRoundTimer(); stopComboTimer();
+        
+        selectedIndices = [];
+        currentStep = 0; // 순서 초기화
+        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        document.getElementById(`btn-${currentGridSize}`).classList.add('active');
+
+        // 규칙 설명 텍스트 업데이트
+        const ruleText = {
+            3: "순서 상관없이 3개를 찾으세요. (60초)",
+            4: "<span class='highlight'>왼쪽부터 순서대로(1→2→3)</span> 찾으세요. (40초)",
+            5: "Target에 표시된 <span class='highlight'>번호 순서대로</span> 찾으세요. (20초)"
+        };
+        ruleDisplay.innerHTML = ruleText[currentGridSize];
+        
+        // 타겟 생성
+        targets = [];
+        while(targets.length < 3) {
+            let t = getRandomTile();
+            if(!targets.some(ex => ex.id === t.id)) targets.push(t);
+        }
+
+        // 순서 규칙 설정 (Sequence Logic)
+        if (currentGridSize === 3) {
+            targetOrder = null; // 순서 없음
+        } else if (currentGridSize === 4) {
+            targetOrder = [0, 1, 2]; // 왼쪽(0) -> 중간(1) -> 오른쪽(2) 고정
+        } else if (currentGridSize === 5) {
+            // 0, 1, 2를 무작위로 섞음 (예: [2, 0, 1] -> 오른쪽 먼저, 그다음 왼쪽...)
+            targetOrder = [0, 1, 2].sort(() => Math.random() - 0.5);
+        }
+
+        // 그리드 채우기
+        tiles = [...targets];
+        const totalCells = currentGridSize * currentGridSize;
+        while(tiles.length < totalCells) {
+            let filler;
+            // 난이도별 오답 생성 로직
+            if(currentGridSize === 5) { // Hard: 방향 함정
+                let base = targets[Math.floor(Math.random() * targets.length)];
+                if(Math.random() > 0.4) {
+                    let newDir = (base.dir + [90,180,270][Math.floor(Math.random()*3)]) % 360;
+                    filler = new Tile(base.shape, base.color, newDir);
+                } else filler = getRandomTile();
+            } else if (currentGridSize === 4) { // Normal: 모양 함정
+                let base = targets[Math.floor(Math.random() * targets.length)];
+                if(Math.random() > 0.5) {
+                    let newShape = Math.floor(Math.random() * SHAPE_COUNT);
+                    while(newShape === base.shape) newShape = Math.floor(Math.random() * SHAPE_COUNT);
+                    filler = new Tile(newShape, base.color, DIRECTIONS[Math.floor(Math.random()*4)]);
+                } else filler = getRandomTile();
+            } else {
+                filler = getRandomTile();
+            }
+            if(!tiles.some(t => t.id === filler.id)) tiles.push(filler);
+        }
+        tiles.sort(() => Math.random() - 0.5);
+
+        drawGrid();
+        drawTargets();
+        startRoundTimer();
+    }
+
+    function getRandomTile() {
+        const s = Math.floor(Math.random() * SHAPE_COUNT);
+        const c = COLORS[Math.floor(Math.random() * COLORS.length)];
+        const d = DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)];
+        return new Tile(s, c, d);
+    }
+
+    // --- Draw ---
+    function drawGrid() {
+        const containerWidth = document.getElementById('game-container').clientWidth - 40;
+        const tileSize = Math.floor(containerWidth / currentGridSize);
+        const gap = 8;
+        const totalSize = tileSize * currentGridSize + gap * (currentGridSize - 1);
+        const dpr = window.devicePixelRatio || 1;
+        
+        gridCanvas.width = totalSize * dpr;
+        gridCanvas.height = totalSize * dpr;
+        gridCanvas.style.width = `${totalSize}px`;
+        gridCanvas.style.height = `${totalSize}px`;
+        gCtx.scale(dpr, dpr);
+        gCtx.clearRect(0,0,totalSize,totalSize);
+
+        tiles.forEach((tile, i) => {
+            const col = i % currentGridSize;
+            const row = Math.floor(i / currentGridSize);
+            const x = col * (tileSize + gap) + tileSize / 2;
+            const y = row * (tileSize + gap) + tileSize / 2;
+            drawShape(gCtx, tile.shape, x, y, tileSize * 0.85, tile.color, tile.dir);
+
+            if(selectedIndices.includes(i)) {
+                gCtx.lineWidth = 4;
+                gCtx.strokeStyle = "#2979FF";
+                gCtx.beginPath();
+                gCtx.roundRect(x-tileSize/2, y-tileSize/2, tileSize, tileSize, 12);
+                gCtx.stroke();
+                gCtx.fillStyle = "rgba(41, 121, 255, 0.2)";
+                gCtx.fill();
+                
+                // 순서 모드일 때 클릭한 순번 표시 (선택적)
+                if(currentGridSize >= 4) {
+                   // 여기에 1, 2, 3 표시를 할 수도 있음
+                }
+            }
+        });
+    }
+
+    function drawTargets() {
+        const dpr = window.devicePixelRatio || 1;
+        const w = document.getElementById('target-area').clientWidth;
+        const h = 70;
+        targetCanvas.width = w * dpr; targetCanvas.height = h * dpr;
+        targetCanvas.style.width = `${w}px`; targetCanvas.style.height = `${h}px`;
+        tCtx.scale(dpr, dpr);
+        const gap = 20; const size = 60;
+        let startX = (w - ((size * 3) + (gap * 2))) / 2 + size/2;
+        
+        targets.forEach((t, i) => {
+            const cx = startX + i * (size + gap);
+            const cy = h/2;
+            drawShape(tCtx, t.shape, cx, cy, size * 0.8, t.color, t.dir);
+
+            // --- 순서 번호 표시 로직 ---
+            if (currentGridSize === 4) {
+                // 4x4: 왼쪽부터 1, 2, 3 (i값 그대로)
+                drawBadge(tCtx, cx + size/3, cy - size/3, i + 1);
+            } else if (currentGridSize === 5) {
+                // 5x5: targetOrder 배열을 역으로 추적하여 번호 표시
+                // targetOrder 배열의 값(순서)이 현재 인덱스(i)인 곳을 찾아야 함.
+                // 예: targetOrder = [2, 0, 1] 이면
+                // Index 0(왼쪽 타겟)은 2번째로 눌러야 함 -> '2' 표시
+                // Index 2(오른쪽 타겟)는 0번째(첫번째)로 눌러야 함 -> '1' 표시
+                
+                // targetOrder의 '몇 번째(k)'에 현재 인덱스(i)가 있는지 찾음
+                const orderNum = targetOrder.indexOf(i) + 1;
+                drawBadge(tCtx, cx + size/3, cy - size/3, orderNum);
+            }
+        });
+    }
+
+    // --- 입력 핸들링 (핵심 수정 부분) ---
+    gridCanvas.addEventListener('pointerdown', (e) => {
+        const rect = gridCanvas.getBoundingClientRect();
+        const tileSize = parseInt(gridCanvas.style.width) / currentGridSize;
+        const idx = Math.floor((e.clientY - rect.top) / tileSize) * currentGridSize + Math.floor((e.clientX - rect.left) / tileSize);
+        if(idx >= 0 && idx < tiles.length) handleTileClick(idx);
+    });
+
+    function handleTileClick(idx) {
+        if (selectedIndices.includes(idx)) return; // 이미 선택한건 무시
+
+        const tile = tiles[idx];
+        let isValidClick = false;
+
+        // 1. 난이도별 정답 검증 로직
+        if (currentGridSize === 3) {
+            // [3x3] 순서 상관없음: targets 배열에 있기만 하면 OK
+            isValidClick = targets.some(t => t.id === tile.id);
+        } 
+        else {
+            // [4x4, 5x5] 순서 중요
+            // 현재 단계(currentStep)에서 눌러야 할 타겟의 인덱스 가져오기
+            const targetIdxToFind = targetOrder[currentStep];
+            const targetToFind = targets[targetIdxToFind];
+            
+            // 클릭한 타일이 '지금 찾아야 할 순서의 타겟'과 일치하는지 확인
+            if (targetToFind.id === tile.id) {
+                isValidClick = true;
+            } else {
+                isValidClick = false; 
+                // 참고: 만약 targets에 포함되어 있어도, 순서가 틀리면 False임
+            }
+        }
+
+        // 2. 결과 처리
+        if (isValidClick) {
+            if (selectedIndices.length === 0) startComboTimer();
+
+            selectedIndices.push(idx);
+            
+            // 순서 모드라면 다음 단계로 진행
+            if (currentGridSize >= 4) {
+                currentStep++;
+            }
+            
+            drawGrid();
+
+            // 3개 모두 찾음?
+            if (selectedIndices.length === 3) {
+                stopComboTimer();
+                setTimeout(() => {
+                    if(navigator.vibrate) navigator.vibrate([50,50,50]);
+                    generateLevel();
+                }, 150);
+            }
+        } else {
+            // 오답 처리 (순서 틀림 or 엉뚱한 타일)
+            gridCanvas.classList.remove('shake');
+            void gridCanvas.offsetWidth;
+            gridCanvas.classList.add('shake');
+            
+            // 4x4 이상에서 순서 틀리면 초기화 하는게 가혹하므로, 여기선 그냥 흔들림만 주고 콤보 시간은 계속 흐르게 둠
+            // (만약 순서 틀렸을 때 초기화 하고 싶다면 아래 주석 해제)
+            // if (currentGridSize >= 4) { selectedIndices = []; currentStep = 0; drawGrid(); }
+            
+            if(navigator.vibrate) navigator.vibrate(100);
+        }
+    }
+
+    function setDifficulty(size) {
+        currentGridSize = size;
+        if (size === 3) roundTimeLimit = 60;
+        else if (size === 4) roundTimeLimit = 40;
+        else if (size === 5) roundTimeLimit = 20;
+        generateLevel();
+    }
+
+    window.addEventListener('resize', () => { drawGrid(); drawTargets(); });
+    setDifficulty(3);
+
+</script>
+</body>
+</html>
