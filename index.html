@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pattern Match: Sequence Mode</title>
+    <title>Pattern Match: Perfect Soft Stars</title>
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
@@ -180,17 +180,15 @@
     // --- 설정 및 데이터 ---
     const COLORS = ["#E53935", "#1E88E5", "#43A047", "#FDD835", "#424242"];
     const DIRECTIONS = [0, 90, 180, 270]; 
-    const SHAPE_COUNT = 14; 
+    const SHAPE_COUNT = 13; // 8이하 별 제거됨 (5각별 제거)
 
     // 게임 상태 변수
     let currentGridSize = 3;
     let tiles = [];
     let targets = [];
-    let selectedIndices = []; // 사용자가 클릭한 타일 인덱스 저장
-    
-    // 순서 관련 변수 (New)
-    let targetOrder = []; // 4x4, 5x5에서 클릭해야 할 타겟 인덱스 순서 (0,1,2 등)
-    let currentStep = 0;  // 현재 몇 번째 순서를 맞추고 있는지 (0 ~ 2)
+    let selectedIndices = [];
+    let targetOrder = [];
+    let currentStep = 0;
 
     // 타이머 변수
     let roundTimeLimit = 60;
@@ -217,29 +215,33 @@
         ctx.save();
         ctx.translate(x, y);
         const r = size / 2;
+        
         ctx.fillStyle = color;
         ctx.beginPath();
-        // 도형 그리기 (기존 로직)
+        
         switch(shapeIdx) {
-            case 0: ctx.rect(-r, -r, size, size); break;
-            case 1: ctx.roundRect(-r, -r, size, size, size * 0.2); break;
-            case 2: { const c = r * 0.4; ctx.moveTo(-r + c, -r); ctx.lineTo(r - c, -r); ctx.lineTo(r, -r + c); ctx.lineTo(r, r - c); ctx.lineTo(r - c, r); ctx.lineTo(-r + c, r); ctx.lineTo(-r, r - c); ctx.lineTo(-r, -r + c); } break;
-            case 3: drawPolygon(ctx, 0, 0, r, 5); break;
-            case 4: drawPolygon(ctx, 0, 0, r, 6); break;
-            case 5: drawPolygon(ctx, 0, 0, r, 8); break;
-            case 6: drawPolygon(ctx, 0, 0, r, 10); break;
-            case 7: ctx.arc(0, 0, r, 0, Math.PI * 2); break;
-            case 8: drawStar(ctx, 0, 0, 8, r, r * 0.7); break;
-            case 9: drawStar(ctx, 0, 0, 12, r, r * 0.8); break;
-            case 10: drawStar(ctx, 0, 0, 16, r, r * 0.75); break;
-            case 11: drawStar(ctx, 0, 0, 5, r, r * 0.5); break;
-            case 12: drawStar(ctx, 0, 0, 6, r, r * 0.55); break;
-            case 13: drawStar(ctx, 0, 0, 8, r, r * 0.45); break;
+            // --- 기본 도형 (각진 형태 - 롤백) ---
+            case 0: ctx.rect(-r, -r, size, size); break; // 정사각형
+            case 1: ctx.roundRect(-r, -r, size, size, size * 0.2); break; // 둥근 사각형
+            case 2: { const c = r * 0.4; ctx.moveTo(-r + c, -r); ctx.lineTo(r - c, -r); ctx.lineTo(r, -r + c); ctx.lineTo(r, r - c); ctx.lineTo(r - c, r); ctx.lineTo(-r + c, r); ctx.lineTo(-r, r - c); ctx.lineTo(-r, -r + c); } break; // 깎인 사각형
+            case 3: drawPolygon(ctx, 0, 0, r, 5); break; // 오각형
+            case 4: drawPolygon(ctx, 0, 0, r, 6); break; // 육각형
+            case 5: drawPolygon(ctx, 0, 0, r, 8); break; // 팔각형
+            case 6: drawPolygon(ctx, 0, 0, r, 10); break; // 십각형
+            case 7: ctx.arc(0, 0, r, 0, Math.PI * 2); break; // 원
+
+            // --- 고각성 별 (완벽한 라운드 처리) ---
+            // 8각성 이상만 사용 (5각별 제거)
+            case 8:  drawPerfectSoftStar(ctx, 0, 0, 8,  r, r * 0.6);  break;
+            case 9:  drawPerfectSoftStar(ctx, 0, 0, 10, r, r * 0.65); break;
+            case 10: drawPerfectSoftStar(ctx, 0, 0, 12, r, r * 0.7);  break;
+            case 11: drawPerfectSoftStar(ctx, 0, 0, 14, r, r * 0.72); break;
+            case 12: drawPerfectSoftStar(ctx, 0, 0, 16, r, r * 0.75); break;
         }
         ctx.closePath();
         ctx.fill();
 
-        // 방향키
+        // 내부 방향키 (뾰족한 삼각형)
         ctx.rotate(direction * Math.PI / 180);
         ctx.fillStyle = "white";
         ctx.beginPath();
@@ -248,16 +250,69 @@
         ctx.lineTo(aS * 0.866, aS * 0.5);
         ctx.lineTo(-aS * 0.866, aS * 0.5);
         ctx.fill();
+
         ctx.restore();
     }
-    function drawPolygon(ctx,x,y,r,s){ctx.moveTo(x+r*Math.cos(-Math.PI/2),y+r*Math.sin(-Math.PI/2));for(let i=1;i<=s;i++)ctx.lineTo(x+r*Math.cos(i*2*Math.PI/s-Math.PI/2),y+r*Math.sin(i*2*Math.PI/s-Math.PI/2));}
-    function drawStar(ctx,cx,cy,s,o,i){let r=Math.PI/2*3,x=cx,y=cy,st=Math.PI/s;ctx.moveTo(cx,cy-o);for(let k=0;k<s;k++){x=cx+Math.cos(r)*o;y=cy+Math.sin(r)*o;ctx.lineTo(x,y);r+=st;x=cx+Math.cos(r)*i;y=cy+Math.sin(r)*i;ctx.lineTo(x,y);r+=st;}ctx.lineTo(cx,cy-o);}
 
-    // 번호 뱃지 그리기 (순서 표시용)
+    // 각진 다각형 그리기 (기본)
+    function drawPolygon(ctx, x, y, r, s) {
+        ctx.moveTo(x + r * Math.cos(-Math.PI/2), y + r * Math.sin(-Math.PI/2));
+        for (let i = 1; i <= s; i++) {
+            ctx.lineTo(x + r * Math.cos(i * 2 * Math.PI / s - Math.PI/2), y + r * Math.sin(i * 2 * Math.PI / s - Math.PI/2));
+        }
+    }
+
+    // [핵심 수정] 완벽하게 부드러운 별 그리기
+    // 시작점을 오목한 부분(Valley)으로 옮겨서 Top 부분이 뾰족해지는 문제 해결
+    function drawPerfectSoftStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {
+        let rot = Math.PI / 2 * 3; // Top 위치 (-90도)
+        let step = Math.PI / spikes;
+        const cornerRadius = outerRadius * 0.08; // 미세한 라운드
+
+        ctx.beginPath();
+        
+        // **FIX: 시작점을 첫 번째 오목한 지점(Inner Point)으로 설정**
+        // 이렇게 하면 Top 꼭짓점(Outer Point 0)을 그릴 때 곡선(arcTo)을 통해 진입하므로 부드러워짐
+        const startInnerX = cx + Math.cos(rot + step) * innerRadius;
+        const startInnerY = cy + Math.sin(rot + step) * innerRadius;
+        ctx.moveTo(startInnerX, startInnerY);
+
+        // 루프를 돌면서 Outer -> Inner 순서로 그리기
+        // i=0일 때 Outer 1(첫번째 뾰족이 다음)을 그리는 것이 아니라, 
+        // 로직상 순서대로 다음 Outer를 향해 감.
+        // 여기선 (i+1)번째 Outer Point를 타겟으로 하여 루프를 돔.
+        
+        for (let i = 0; i < spikes; i++) {
+            // 현재 Inner에서 다음 Outer로 향하는 라운드 처리
+            // 타겟 인덱스: (i+1) % spikes -> 즉, 다음 Outer Point
+            // (시작이 I0 이므로, 첫 타겟은 O1. 마지막에 O0(Top)을 그리며 닫힘)
+            
+            let idx = (i + 1) % spikes; // 1, 2, ..., spikes-1, 0
+            
+            // 각도 계산
+            let outerAngle = rot + (idx * 2 * step); 
+            let innerAngle = rot + (idx * 2 * step) + step;
+
+            let ox = cx + Math.cos(outerAngle) * outerRadius;
+            let oy = cy + Math.sin(outerAngle) * outerRadius;
+
+            let ix = cx + Math.cos(innerAngle) * innerRadius;
+            let iy = cy + Math.sin(innerAngle) * innerRadius;
+
+            // Outer Point는 둥글게 (arcTo)
+            ctx.arcTo(ox, oy, ix, iy, cornerRadius);
+            // Inner Point로 직선 연결 (오목한 부분은 뾰족하게 유지하여 별 느낌 살림)
+            ctx.lineTo(ix, iy); 
+        }
+        ctx.closePath();
+    }
+
+
+    // 번호 뱃지 그리기
     function drawBadge(ctx, x, y, number) {
         ctx.save();
         ctx.translate(x, y);
-        ctx.fillStyle = "#E53935"; // Red Badge
+        ctx.fillStyle = "#E53935";
         ctx.beginPath();
         ctx.arc(0, 0, 10, 0, Math.PI * 2);
         ctx.fill();
@@ -276,7 +331,7 @@
         }
     }
 
-    // --- 타이머 함수들 (기존 동일) ---
+    // --- 타이머 함수들 ---
     function startRoundTimer() {
         stopRoundTimer();
         roundTimeLeft = roundTimeLimit;
@@ -321,7 +376,7 @@
         gridCanvas.classList.add('shake');
         setTimeout(() => gridCanvas.classList.remove('shake'), 500);
         selectedIndices = [];
-        currentStep = 0; // 순서도 초기화
+        currentStep = 0;
         drawGrid();
         if(navigator.vibrate) navigator.vibrate(200);
     }
@@ -332,11 +387,10 @@
         stopRoundTimer(); stopComboTimer();
         
         selectedIndices = [];
-        currentStep = 0; // 순서 초기화
+        currentStep = 0;
         document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
         document.getElementById(`btn-${currentGridSize}`).classList.add('active');
 
-        // 규칙 설명 텍스트 업데이트
         const ruleText = {
             3: "순서 상관없이 3개를 찾으세요. (60초)",
             4: "<span class='highlight'>왼쪽부터 순서대로(1→2→3)</span> 찾으세요. (40초)",
@@ -344,36 +398,31 @@
         };
         ruleDisplay.innerHTML = ruleText[currentGridSize];
         
-        // 타겟 생성
         targets = [];
         while(targets.length < 3) {
             let t = getRandomTile();
             if(!targets.some(ex => ex.id === t.id)) targets.push(t);
         }
 
-        // 순서 규칙 설정 (Sequence Logic)
         if (currentGridSize === 3) {
-            targetOrder = null; // 순서 없음
+            targetOrder = null;
         } else if (currentGridSize === 4) {
-            targetOrder = [0, 1, 2]; // 왼쪽(0) -> 중간(1) -> 오른쪽(2) 고정
+            targetOrder = [0, 1, 2];
         } else if (currentGridSize === 5) {
-            // 0, 1, 2를 무작위로 섞음 (예: [2, 0, 1] -> 오른쪽 먼저, 그다음 왼쪽...)
             targetOrder = [0, 1, 2].sort(() => Math.random() - 0.5);
         }
 
-        // 그리드 채우기
         tiles = [...targets];
         const totalCells = currentGridSize * currentGridSize;
         while(tiles.length < totalCells) {
             let filler;
-            // 난이도별 오답 생성 로직
-            if(currentGridSize === 5) { // Hard: 방향 함정
+            if(currentGridSize === 5) {
                 let base = targets[Math.floor(Math.random() * targets.length)];
                 if(Math.random() > 0.4) {
                     let newDir = (base.dir + [90,180,270][Math.floor(Math.random()*3)]) % 360;
                     filler = new Tile(base.shape, base.color, newDir);
                 } else filler = getRandomTile();
-            } else if (currentGridSize === 4) { // Normal: 모양 함정
+            } else if (currentGridSize === 4) {
                 let base = targets[Math.floor(Math.random() * targets.length)];
                 if(Math.random() > 0.5) {
                     let newShape = Math.floor(Math.random() * SHAPE_COUNT);
@@ -429,11 +478,6 @@
                 gCtx.stroke();
                 gCtx.fillStyle = "rgba(41, 121, 255, 0.2)";
                 gCtx.fill();
-                
-                // 순서 모드일 때 클릭한 순번 표시 (선택적)
-                if(currentGridSize >= 4) {
-                   // 여기에 1, 2, 3 표시를 할 수도 있음
-                }
             }
         });
     }
@@ -453,25 +497,16 @@
             const cy = h/2;
             drawShape(tCtx, t.shape, cx, cy, size * 0.8, t.color, t.dir);
 
-            // --- 순서 번호 표시 로직 ---
             if (currentGridSize === 4) {
-                // 4x4: 왼쪽부터 1, 2, 3 (i값 그대로)
                 drawBadge(tCtx, cx + size/3, cy - size/3, i + 1);
             } else if (currentGridSize === 5) {
-                // 5x5: targetOrder 배열을 역으로 추적하여 번호 표시
-                // targetOrder 배열의 값(순서)이 현재 인덱스(i)인 곳을 찾아야 함.
-                // 예: targetOrder = [2, 0, 1] 이면
-                // Index 0(왼쪽 타겟)은 2번째로 눌러야 함 -> '2' 표시
-                // Index 2(오른쪽 타겟)는 0번째(첫번째)로 눌러야 함 -> '1' 표시
-                
-                // targetOrder의 '몇 번째(k)'에 현재 인덱스(i)가 있는지 찾음
                 const orderNum = targetOrder.indexOf(i) + 1;
                 drawBadge(tCtx, cx + size/3, cy - size/3, orderNum);
             }
         });
     }
 
-    // --- 입력 핸들링 (핵심 수정 부분) ---
+    // --- 입력 핸들링 ---
     gridCanvas.addEventListener('pointerdown', (e) => {
         const rect = gridCanvas.getBoundingClientRect();
         const tileSize = parseInt(gridCanvas.style.width) / currentGridSize;
@@ -480,45 +515,35 @@
     });
 
     function handleTileClick(idx) {
-        if (selectedIndices.includes(idx)) return; // 이미 선택한건 무시
+        if (selectedIndices.includes(idx)) return;
 
         const tile = tiles[idx];
         let isValidClick = false;
 
-        // 1. 난이도별 정답 검증 로직
         if (currentGridSize === 3) {
-            // [3x3] 순서 상관없음: targets 배열에 있기만 하면 OK
             isValidClick = targets.some(t => t.id === tile.id);
         } 
         else {
-            // [4x4, 5x5] 순서 중요
-            // 현재 단계(currentStep)에서 눌러야 할 타겟의 인덱스 가져오기
             const targetIdxToFind = targetOrder[currentStep];
             const targetToFind = targets[targetIdxToFind];
-            
-            // 클릭한 타일이 '지금 찾아야 할 순서의 타겟'과 일치하는지 확인
             if (targetToFind.id === tile.id) {
                 isValidClick = true;
             } else {
                 isValidClick = false; 
-                // 참고: 만약 targets에 포함되어 있어도, 순서가 틀리면 False임
             }
         }
 
-        // 2. 결과 처리
         if (isValidClick) {
             if (selectedIndices.length === 0) startComboTimer();
 
             selectedIndices.push(idx);
             
-            // 순서 모드라면 다음 단계로 진행
             if (currentGridSize >= 4) {
                 currentStep++;
             }
             
             drawGrid();
 
-            // 3개 모두 찾음?
             if (selectedIndices.length === 3) {
                 stopComboTimer();
                 setTimeout(() => {
@@ -527,15 +552,9 @@
                 }, 150);
             }
         } else {
-            // 오답 처리 (순서 틀림 or 엉뚱한 타일)
             gridCanvas.classList.remove('shake');
             void gridCanvas.offsetWidth;
             gridCanvas.classList.add('shake');
-            
-            // 4x4 이상에서 순서 틀리면 초기화 하는게 가혹하므로, 여기선 그냥 흔들림만 주고 콤보 시간은 계속 흐르게 둠
-            // (만약 순서 틀렸을 때 초기화 하고 싶다면 아래 주석 해제)
-            // if (currentGridSize >= 4) { selectedIndices = []; currentStep = 0; drawGrid(); }
-            
             if(navigator.vibrate) navigator.vibrate(100);
         }
     }
