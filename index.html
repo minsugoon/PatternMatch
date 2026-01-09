@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pattern Match: Perfect Soft Stars</title>
+    <title>Pattern Match: Trinity Modes</title>
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
@@ -12,6 +12,7 @@
             --primary: #1E88E5;
             --danger: #E53935;
             --success: #43A047;
+            --warning: #FDD835;
             --text: #333;
         }
 
@@ -28,59 +29,82 @@
             -webkit-user-select: none;
         }
 
-        /* 타이머바 */
-        #round-timer-bar {
+        /* --- 상단 UI --- */
+        #top-bar {
             width: 100%;
-            height: 8px;
-            background: #e0e0e0;
-            position: fixed;
-            top: 0;
-            left: 0;
-            z-index: 100;
+            background: white;
+            padding: 15px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
         }
-        #round-progress {
+
+        /* 타이머 바 */
+        #timer-container {
+            width: 90%;
+            height: 10px;
+            background: #eee;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        #timer-progress {
             width: 100%;
             height: 100%;
             background: var(--success);
-            transition: width 1s linear;
+            transition: width 0.1s linear, background 0.3s;
         }
 
-        header {
-            margin-top: 24px;
-            text-align: center;
-            width: 100%;
-        }
-
-        h1 { margin: 0; font-size: 1.2rem; color: #444; font-weight: 700; }
-        .info-text { font-size: 0.8rem; color: #666; margin-top: 4px; min-height: 1.2em;}
-        .highlight { color: var(--danger); font-weight: bold; }
-        
-        .difficulty-btn-group {
+        /* 점수 및 정보 표시 */
+        .game-info {
             display: flex;
-            gap: 8px;
-            justify-content: center;
-            margin-top: 12px;
+            justify-content: space-between;
+            width: 90%;
+            font-weight: 700;
+            color: #444;
+            font-size: 1.1rem;
         }
-        
-        button {
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            background: #ddd;
-            color: #666;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        button.active {
+        .mode-badge {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 4px;
             background: #333;
             color: white;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            transform: scale(1.05);
         }
 
+        /* 모드 선택 버튼 */
+        .mode-selector {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .mode-btn {
+            border: none;
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: #e0e0e0;
+            color: #666;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+        .mode-btn span { font-size: 0.7rem; font-weight: 400; margin-top: 2px; }
+        .mode-btn.active {
+            background: #333;
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .mode-btn.active span { color: #ccc; }
+
+        /* --- 게임 영역 --- */
         #game-container {
             flex: 1;
             display: flex;
@@ -95,49 +119,39 @@
         }
 
         canvas {
-            border-radius: 12px;
+            border-radius: 16px;
             touch-action: none;
         }
 
         #grid-canvas {
             background: white;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
             margin-bottom: 20px;
         }
 
         #target-area {
-            background: rgba(255,255,255,0.7);
+            background: rgba(255,255,255,0.8);
             padding: 15px;
-            border-radius: 16px;
+            border-radius: 20px;
             width: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
             border: 1px solid rgba(0,0,0,0.05);
-            position: relative;
-            overflow: hidden;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(10px);
         }
 
-        #combo-timer-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            height: 4px;
-            background: var(--danger);
-            width: 0%;
-            transition: width 0.1s linear;
-        }
-        
-        .label-group {
-            display: flex;
-            justify-content: space-between;
+        .label {
+            font-size: 0.9rem;
+            color: #555;
+            font-weight: 700;
+            margin-bottom: 5px;
             width: 100%;
-            margin-bottom: 8px;
+            text-align: left;
+            padding-left: 10px;
         }
-        .label { font-size: 0.85rem; color: #666; font-weight: 600; }
-        .combo-text { font-size: 0.85rem; color: var(--danger); font-weight: 800; display: none; }
 
+        /* 애니메이션 */
         @keyframes shake {
             0% { transform: translateX(0); }
             25% { transform: translateX(-5px); }
@@ -147,70 +161,118 @@
         }
         .shake { animation: shake 0.3s; }
 
+        /* 게임 오버 모달 */
+        #modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+        #result-modal {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            width: 80%;
+            max-width: 300px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            animation: pop 0.3s ease-out;
+        }
+        @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .modal-title { font-size: 1.5rem; font-weight: 800; margin-bottom: 10px; color: #333; }
+        .modal-score { font-size: 2.5rem; font-weight: 900; color: var(--primary); margin: 20px 0; }
+        .modal-desc { font-size: 1rem; color: #666; margin-bottom: 20px; }
+        .restart-btn {
+            background: #333; color: white; border: none; padding: 12px 24px;
+            border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer;
+            width: 100%;
+        }
+
     </style>
 </head>
 <body>
 
-    <div id="round-timer-bar"><div id="round-progress"></div></div>
-
-    <header>
-        <h1>Pattern Match</h1>
-        <div class="info-text" id="rule-display"></div>
-        <div class="difficulty-btn-group">
-            <button onclick="setDifficulty(3)" id="btn-3">3x3</button>
-            <button onclick="setDifficulty(4)" id="btn-4">4x4</button>
-            <button onclick="setDifficulty(5)" id="btn-5">5x5</button>
+    <div id="top-bar">
+        <div id="timer-container"><div id="timer-progress"></div></div>
+        <div class="game-info">
+            <span class="mode-badge" id="mode-badge">3x3 Speed Blitz</span>
+            <span id="score-display">Score: 0</span>
         </div>
-    </header>
+        
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="setGameMode(3)" id="btn-3">
+                3x3 <span>Speed</span>
+            </button>
+            <button class="mode-btn" onclick="setGameMode(4)" id="btn-4">
+                4x4 <span>Infinite</span>
+            </button>
+            <button class="mode-btn" onclick="setGameMode(5)" id="btn-5">
+                5x5 <span>Survival</span>
+            </button>
+        </div>
+    </div>
 
     <div id="game-container">
         <canvas id="grid-canvas"></canvas>
-        
         <div id="target-area">
-            <div class="label-group">
-                <span class="label">Target</span>
-                <span class="combo-text" id="combo-alert">⚡ 5초 안에 완료!</span>
-            </div>
+            <div class="label" id="instruction-text">순서 상관없이 찾으세요!</div>
             <canvas id="target-canvas"></canvas>
-            <div id="combo-timer-overlay"></div>
+        </div>
+    </div>
+
+    <div id="modal-overlay">
+        <div id="result-modal">
+            <div class="modal-title" id="res-title">GAME OVER</div>
+            <div class="modal-desc" id="res-desc">최종 기록</div>
+            <div class="modal-score" id="res-score">0</div>
+            <button class="restart-btn" onclick="restartGame()">다시 도전</button>
         </div>
     </div>
 
 <script>
-    // --- 설정 및 데이터 ---
+    // --- 1. 설정 및 데이터 ---
     const COLORS = ["#E53935", "#1E88E5", "#43A047", "#FDD835", "#424242"];
     const DIRECTIONS = [0, 90, 180, 270]; 
     const SHAPE_COUNT = 13; // 8이하 별 제거됨 (5각별 제거)
 
-    // 게임 상태 변수
-    let currentGridSize = 3;
+    // 게임 상태
+    let gridSize = 3;
     let tiles = [];
     let targets = [];
     let selectedIndices = [];
-    let targetOrder = [];
+    let targetOrder = []; // 순서 저장용
     let currentStep = 0;
+    
+    // 점수 및 모드 관련
+    let score = 0;
+    let round = 1;
+    let isGameOver = false;
+    let gameMode = 'speed'; // speed(3x3), infinite(4x4), survival(5x5)
 
     // 타이머 변수
-    let roundTimeLimit = 60;
-    let roundTimeLeft = 60;
-    let roundTimerId = null;
+    let timeLeft = 0;
+    let maxTime = 0;
+    let lastTime = 0;
+    let timerId = null;
 
-    let comboTimeLimit = 5000;
-    let comboStartTime = 0;
-    let comboTimerId = null;
-    let isComboActive = false;
-
+    // 캔버스
     const gridCanvas = document.getElementById('grid-canvas');
     const targetCanvas = document.getElementById('target-canvas');
     const gCtx = gridCanvas.getContext('2d');
     const tCtx = targetCanvas.getContext('2d');
     
-    const roundProgressBar = document.getElementById('round-progress');
-    const comboProgressBar = document.getElementById('combo-timer-overlay');
-    const comboAlert = document.getElementById('combo-alert');
-    const ruleDisplay = document.getElementById('rule-display');
+    // UI 요소
+    const timerBar = document.getElementById('timer-progress');
+    const scoreDisplay = document.getElementById('score-display');
+    const modeBadge = document.getElementById('mode-badge');
+    const instructionText = document.getElementById('instruction-text');
+    const modal = document.getElementById('modal-overlay');
 
-    // --- 그리기 함수 ---
+    // --- 2. 도형 그리기 엔진 (롤백 + Soft Star) ---
     function drawShape(ctx, shapeIdx, x, y, size, color, direction) {
         ctx.save();
         ctx.translate(x, y);
@@ -220,18 +282,15 @@
         ctx.beginPath();
         
         switch(shapeIdx) {
-            // --- 기본 도형 (각진 형태 - 롤백) ---
-            case 0: ctx.rect(-r, -r, size, size); break; // 정사각형
-            case 1: ctx.roundRect(-r, -r, size, size, size * 0.2); break; // 둥근 사각형
-            case 2: { const c = r * 0.4; ctx.moveTo(-r + c, -r); ctx.lineTo(r - c, -r); ctx.lineTo(r, -r + c); ctx.lineTo(r, r - c); ctx.lineTo(r - c, r); ctx.lineTo(-r + c, r); ctx.lineTo(-r, r - c); ctx.lineTo(-r, -r + c); } break; // 깎인 사각형
-            case 3: drawPolygon(ctx, 0, 0, r, 5); break; // 오각형
-            case 4: drawPolygon(ctx, 0, 0, r, 6); break; // 육각형
-            case 5: drawPolygon(ctx, 0, 0, r, 8); break; // 팔각형
-            case 6: drawPolygon(ctx, 0, 0, r, 10); break; // 십각형
-            case 7: ctx.arc(0, 0, r, 0, Math.PI * 2); break; // 원
-
-            // --- 고각성 별 (완벽한 라운드 처리) ---
-            // 8각성 이상만 사용 (5각별 제거)
+            case 0: ctx.rect(-r, -r, size, size); break; 
+            case 1: ctx.roundRect(-r, -r, size, size, size * 0.2); break; 
+            case 2: { const c = r * 0.4; ctx.moveTo(-r + c, -r); ctx.lineTo(r - c, -r); ctx.lineTo(r, -r + c); ctx.lineTo(r, r - c); ctx.lineTo(r - c, r); ctx.lineTo(-r + c, r); ctx.lineTo(-r, r - c); ctx.lineTo(-r, -r + c); } break; 
+            case 3: drawPolygon(ctx, 0, 0, r, 5); break; 
+            case 4: drawPolygon(ctx, 0, 0, r, 6); break; 
+            case 5: drawPolygon(ctx, 0, 0, r, 8); break; 
+            case 6: drawPolygon(ctx, 0, 0, r, 10); break; 
+            case 7: ctx.arc(0, 0, r, 0, Math.PI * 2); break; 
+            // Soft Stars (8+)
             case 8:  drawPerfectSoftStar(ctx, 0, 0, 8,  r, r * 0.6);  break;
             case 9:  drawPerfectSoftStar(ctx, 0, 0, 10, r, r * 0.65); break;
             case 10: drawPerfectSoftStar(ctx, 0, 0, 12, r, r * 0.7);  break;
@@ -241,7 +300,7 @@
         ctx.closePath();
         ctx.fill();
 
-        // 내부 방향키 (뾰족한 삼각형)
+        // 내부 화살표
         ctx.rotate(direction * Math.PI / 180);
         ctx.fillStyle = "white";
         ctx.beginPath();
@@ -250,65 +309,36 @@
         ctx.lineTo(aS * 0.866, aS * 0.5);
         ctx.lineTo(-aS * 0.866, aS * 0.5);
         ctx.fill();
-
         ctx.restore();
     }
 
-    // 각진 다각형 그리기 (기본)
     function drawPolygon(ctx, x, y, r, s) {
         ctx.moveTo(x + r * Math.cos(-Math.PI/2), y + r * Math.sin(-Math.PI/2));
-        for (let i = 1; i <= s; i++) {
-            ctx.lineTo(x + r * Math.cos(i * 2 * Math.PI / s - Math.PI/2), y + r * Math.sin(i * 2 * Math.PI / s - Math.PI/2));
-        }
+        for (let i = 1; i <= s; i++) ctx.lineTo(x + r * Math.cos(i * 2 * Math.PI / s - Math.PI/2), y + r * Math.sin(i * 2 * Math.PI / s - Math.PI/2));
     }
 
-    // [핵심 수정] 완벽하게 부드러운 별 그리기
-    // 시작점을 오목한 부분(Valley)으로 옮겨서 Top 부분이 뾰족해지는 문제 해결
     function drawPerfectSoftStar(ctx, cx, cy, spikes, outerRadius, innerRadius) {
-        let rot = Math.PI / 2 * 3; // Top 위치 (-90도)
+        let rot = Math.PI / 2 * 3; 
         let step = Math.PI / spikes;
-        const cornerRadius = outerRadius * 0.08; // 미세한 라운드
-
+        const cornerRadius = outerRadius * 0.08; 
         ctx.beginPath();
-        
-        // **FIX: 시작점을 첫 번째 오목한 지점(Inner Point)으로 설정**
-        // 이렇게 하면 Top 꼭짓점(Outer Point 0)을 그릴 때 곡선(arcTo)을 통해 진입하므로 부드러워짐
         const startInnerX = cx + Math.cos(rot + step) * innerRadius;
         const startInnerY = cy + Math.sin(rot + step) * innerRadius;
         ctx.moveTo(startInnerX, startInnerY);
-
-        // 루프를 돌면서 Outer -> Inner 순서로 그리기
-        // i=0일 때 Outer 1(첫번째 뾰족이 다음)을 그리는 것이 아니라, 
-        // 로직상 순서대로 다음 Outer를 향해 감.
-        // 여기선 (i+1)번째 Outer Point를 타겟으로 하여 루프를 돔.
-        
         for (let i = 0; i < spikes; i++) {
-            // 현재 Inner에서 다음 Outer로 향하는 라운드 처리
-            // 타겟 인덱스: (i+1) % spikes -> 즉, 다음 Outer Point
-            // (시작이 I0 이므로, 첫 타겟은 O1. 마지막에 O0(Top)을 그리며 닫힘)
-            
-            let idx = (i + 1) % spikes; // 1, 2, ..., spikes-1, 0
-            
-            // 각도 계산
+            let idx = (i + 1) % spikes; 
             let outerAngle = rot + (idx * 2 * step); 
             let innerAngle = rot + (idx * 2 * step) + step;
-
             let ox = cx + Math.cos(outerAngle) * outerRadius;
             let oy = cy + Math.sin(outerAngle) * outerRadius;
-
             let ix = cx + Math.cos(innerAngle) * innerRadius;
             let iy = cy + Math.sin(innerAngle) * innerRadius;
-
-            // Outer Point는 둥글게 (arcTo)
             ctx.arcTo(ox, oy, ix, iy, cornerRadius);
-            // Inner Point로 직선 연결 (오목한 부분은 뾰족하게 유지하여 별 느낌 살림)
             ctx.lineTo(ix, iy); 
         }
         ctx.closePath();
     }
 
-
-    // 번호 뱃지 그리기
     function drawBadge(ctx, x, y, number) {
         ctx.save();
         ctx.translate(x, y);
@@ -331,105 +361,142 @@
         }
     }
 
-    // --- 타이머 함수들 ---
-    function startRoundTimer() {
-        stopRoundTimer();
-        roundTimeLeft = roundTimeLimit;
-        updateRoundBar();
-        roundTimerId = setInterval(() => {
-            roundTimeLeft--;
-            updateRoundBar();
-            if(roundTimeLeft <= 0) {
-                stopRoundTimer(); stopComboTimer();
-                alert("⏰ 시간 초과! (Time Over)");
-                generateLevel();
-            }
-        }, 1000);
-    }
-    function stopRoundTimer() { if(roundTimerId) clearInterval(roundTimerId); }
-    function updateRoundBar() {
-        const pct = (roundTimeLeft / roundTimeLimit) * 100;
-        roundProgressBar.style.width = `${pct}%`;
-        roundProgressBar.style.background = pct > 50 ? "#43A047" : (pct > 20 ? "#FB8C00" : "#E53935");
-    }
-    function startComboTimer() {
-        if(isComboActive) return;
-        isComboActive = true;
-        comboStartTime = Date.now();
-        comboAlert.style.display = "block"; 
-        comboTimerId = setInterval(() => {
-            const elapsed = Date.now() - comboStartTime;
-            const remaining = comboTimeLimit - elapsed;
-            const pct = (remaining / comboTimeLimit) * 100;
-            comboProgressBar.style.width = `${pct}%`;
-            if(remaining <= 0) failCombo();
-        }, 50);
-    }
-    function stopComboTimer() {
-        isComboActive = false;
-        clearInterval(comboTimerId);
-        comboProgressBar.style.width = "0%";
-        comboAlert.style.display = "none";
-    }
-    function failCombo() {
-        stopComboTimer();
-        gridCanvas.classList.add('shake');
-        setTimeout(() => gridCanvas.classList.remove('shake'), 500);
-        selectedIndices = [];
-        currentStep = 0;
-        drawGrid();
-        if(navigator.vibrate) navigator.vibrate(200);
+    // --- 3. 게임 모드 관리 ---
+
+    function setGameMode(size) {
+        gridSize = size;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`btn-${size}`).classList.add('active');
+
+        // 모드별 설정 초기화
+        if (size === 3) {
+            gameMode = 'speed';
+            maxTime = 60; // 60초 고정
+            modeBadge.innerText = "3x3 타자왕 (Speed Blitz)";
+            modeBadge.style.background = "#1E88E5";
+            instructionText.innerHTML = "순서 상관없이 3개를 빠르게 찾으세요!";
+        } else if (size === 4) {
+            gameMode = 'infinite';
+            maxTime = 30; // 시작 30초, +5/-10
+            modeBadge.innerText = "4x4 집중력 마스터 (Infinite)";
+            modeBadge.style.background = "#FDD835";
+            modeBadge.style.color = "#333";
+            instructionText.innerHTML = "<span style='color:#E53935'>왼쪽부터 순서대로 (1→2→3)</span> 찾으세요! (시간 연장)";
+        } else if (size === 5) {
+            gameMode = 'survival';
+            maxTime = 20; // 라운드당 20초
+            modeBadge.innerText = "5x5 생존자 (Perfect Survival)";
+            modeBadge.style.background = "#E53935";
+            instructionText.innerHTML = "번호 순서대로 찾으세요. <span style='color:#E53935'>틀리면 즉시 종료!</span>";
+        }
+
+        restartGame();
     }
 
-    // --- 게임 로직 ---
+    function restartGame() {
+        modal.style.display = 'none';
+        isGameOver = false;
+        score = 0;
+        round = 1;
+        timeLeft = maxTime;
+        lastTime = Date.now();
+        
+        updateScoreDisplay();
+        generateLevel();
+        
+        if (timerId) cancelAnimationFrame(timerId);
+        gameLoop();
+    }
+
+    // --- 4. 게임 루프 & 타이머 ---
+
+    function gameLoop() {
+        if (isGameOver) return;
+
+        const now = Date.now();
+        const delta = (now - lastTime) / 1000;
+        lastTime = now;
+
+        timeLeft -= delta;
+
+        // UI 업데이트
+        // 4x4 모드는 시간이 maxTime보다 늘어날 수 있으므로 비율 계산 주의
+        let pct = 0;
+        if (gameMode === 'infinite') {
+             // 4x4는 60초를 시각적 기준으로 잡되, 넘어가면 꽉 찬 상태 유지
+             pct = Math.min((timeLeft / 60) * 100, 100); 
+        } else {
+             pct = (timeLeft / maxTime) * 100;
+        }
+        
+        timerBar.style.width = `${Math.max(0, pct)}%`;
+        
+        // 색상 변경
+        if (pct < 20) timerBar.style.background = "#E53935";
+        else if (pct < 50) timerBar.style.background = "#FDD835";
+        else timerBar.style.background = "#43A047";
+
+        if (timeLeft <= 0) {
+            endGame("시간 종료!");
+            return;
+        }
+
+        timerId = requestAnimationFrame(gameLoop);
+    }
+
+    function updateScoreDisplay() {
+        if (gameMode === 'survival') {
+            scoreDisplay.innerText = `Round: ${round}`;
+        } else {
+            scoreDisplay.innerText = `Score: ${score}`;
+        }
+    }
+
+    // --- 5. 레벨 생성 로직 ---
 
     function generateLevel() {
-        stopRoundTimer(); stopComboTimer();
-        
         selectedIndices = [];
         currentStep = 0;
-        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-        document.getElementById(`btn-${currentGridSize}`).classList.add('active');
-
-        const ruleText = {
-            3: "순서 상관없이 3개를 찾으세요. (60초)",
-            4: "<span class='highlight'>왼쪽부터 순서대로(1→2→3)</span> 찾으세요. (40초)",
-            5: "Target에 표시된 <span class='highlight'>번호 순서대로</span> 찾으세요. (20초)"
-        };
-        ruleDisplay.innerHTML = ruleText[currentGridSize];
         
+        // 타겟 생성
         targets = [];
         while(targets.length < 3) {
             let t = getRandomTile();
             if(!targets.some(ex => ex.id === t.id)) targets.push(t);
         }
 
-        if (currentGridSize === 3) {
-            targetOrder = null;
-        } else if (currentGridSize === 4) {
-            targetOrder = [0, 1, 2];
-        } else if (currentGridSize === 5) {
-            targetOrder = [0, 1, 2].sort(() => Math.random() - 0.5);
+        // 모드별 순서 설정
+        if (gameMode === 'speed') {
+            targetOrder = null; // 순서 없음
+        } else if (gameMode === 'infinite') {
+            targetOrder = [0, 1, 2]; // 1->2->3 고정
+        } else if (gameMode === 'survival') {
+            targetOrder = [0, 1, 2].sort(() => Math.random() - 0.5); // 랜덤 순서
         }
 
+        // 그리드 채우기 (오답 함정 로직 포함)
         tiles = [...targets];
-        const totalCells = currentGridSize * currentGridSize;
+        const totalCells = gridSize * gridSize;
         while(tiles.length < totalCells) {
             let filler;
-            if(currentGridSize === 5) {
+            // 5x5는 어렵게 (방향 함정)
+            if(gameMode === 'survival') {
                 let base = targets[Math.floor(Math.random() * targets.length)];
                 if(Math.random() > 0.4) {
                     let newDir = (base.dir + [90,180,270][Math.floor(Math.random()*3)]) % 360;
                     filler = new Tile(base.shape, base.color, newDir);
                 } else filler = getRandomTile();
-            } else if (currentGridSize === 4) {
+            } 
+            // 4x4는 보통 (모양 함정)
+            else if (gameMode === 'infinite') {
                 let base = targets[Math.floor(Math.random() * targets.length)];
                 if(Math.random() > 0.5) {
                     let newShape = Math.floor(Math.random() * SHAPE_COUNT);
                     while(newShape === base.shape) newShape = Math.floor(Math.random() * SHAPE_COUNT);
                     filler = new Tile(newShape, base.color, DIRECTIONS[Math.floor(Math.random()*4)]);
                 } else filler = getRandomTile();
-            } else {
+            } 
+            else {
                 filler = getRandomTile();
             }
             if(!tiles.some(t => t.id === filler.id)) tiles.push(filler);
@@ -438,7 +505,6 @@
 
         drawGrid();
         drawTargets();
-        startRoundTimer();
     }
 
     function getRandomTile() {
@@ -448,12 +514,119 @@
         return new Tile(s, c, d);
     }
 
-    // --- Draw ---
+    // --- 6. 입력 처리 (핵심) ---
+
+    gridCanvas.addEventListener('pointerdown', (e) => {
+        if(isGameOver) return;
+        const rect = gridCanvas.getBoundingClientRect();
+        const tileSize = parseInt(gridCanvas.style.width) / gridSize;
+        const idx = Math.floor((e.clientY - rect.top) / tileSize) * gridSize + Math.floor((e.clientX - rect.left) / tileSize);
+        if(idx >= 0 && idx < tiles.length) handleTileClick(idx);
+    });
+
+    function handleTileClick(idx) {
+        if (selectedIndices.includes(idx)) return;
+
+        const tile = tiles[idx];
+        let isCorrect = false;
+
+        // 모드별 정답 판정
+        if (gameMode === 'speed') {
+            // 3x3: 순서 무관, 타겟에 있기만 하면 됨
+            isCorrect = targets.some(t => t.id === tile.id);
+        } else {
+            // 4x4, 5x5: 현재 순서(currentStep)에 맞는 타겟이어야 함
+            const targetIdxToFind = targetOrder[currentStep];
+            const targetToFind = targets[targetIdxToFind];
+            if (targetToFind.id === tile.id) isCorrect = true;
+        }
+
+        if (isCorrect) {
+            // 정답 처리
+            selectedIndices.push(idx);
+            if (gameMode !== 'speed') currentStep++; // 순서 진행
+            
+            drawGrid();
+
+            // 라운드 클리어?
+            if (selectedIndices.length === 3) {
+                setTimeout(nextRound, 100);
+            }
+        } else {
+            // 오답 처리
+            handleMistake();
+        }
+    }
+
+    function nextRound() {
+        if (gameMode === 'speed') {
+            score++; 
+        } else if (gameMode === 'infinite') {
+            score += 100; // 기본 점수
+            timeLeft += 5; // 시간 보너스
+            // 시각적 피드백 (시간 추가)
+            timerBar.style.background = "#fff";
+            setTimeout(() => timerBar.style.background = "#43A047", 100);
+        } else if (gameMode === 'survival') {
+            round++;
+            timeLeft = maxTime; // 시간 초기화 (라운드제)
+        }
+        updateScoreDisplay();
+        generateLevel();
+    }
+
+    function handleMistake() {
+        // 화면 흔들림
+        gridCanvas.classList.remove('shake');
+        void gridCanvas.offsetWidth;
+        gridCanvas.classList.add('shake');
+        if(navigator.vibrate) navigator.vibrate(200);
+
+        if (gameMode === 'speed') {
+            // 3x3: 페널티 없음 (그냥 시간만 흐름)
+        } else if (gameMode === 'infinite') {
+            // 4x4: 시간 10초 차감
+            timeLeft -= 10;
+            // 시각적 피드백 (빨간 번쩍임)
+            document.body.style.background = "#ffcdd2";
+            setTimeout(() => document.body.style.background = "#f5f5f7", 100);
+        } else if (gameMode === 'survival') {
+            // 5x5: 즉시 사망
+            endGame("잘못된 선택!");
+        }
+    }
+
+    function endGame(reason) {
+        isGameOver = true;
+        document.getElementById('res-title').innerText = reason;
+        
+        let resultText = "";
+        let finalValue = "";
+        
+        if (gameMode === 'speed') {
+            resultText = "총 클리어 횟수";
+            finalValue = `${score}회`;
+        } else if (gameMode === 'infinite') {
+            resultText = "최종 점수";
+            finalValue = `${Math.floor(score + (Date.now() - lastTime)/100)}점`; // 단순 예시
+            finalValue = `${score}점`;
+        } else {
+            resultText = "생존 라운드";
+            finalValue = `${round}라운드`;
+        }
+
+        document.getElementById('res-desc').innerText = resultText;
+        document.getElementById('res-score').innerText = finalValue;
+        
+        modal.style.display = 'flex';
+    }
+
+    // --- 그리기 헬퍼 ---
     function drawGrid() {
         const containerWidth = document.getElementById('game-container').clientWidth - 40;
-        const tileSize = Math.floor(containerWidth / currentGridSize);
+        const tileSize = Math.floor(containerWidth / gridSize);
         const gap = 8;
-        const totalSize = tileSize * currentGridSize + gap * (currentGridSize - 1);
+        const totalSize = tileSize * gridSize + gap * (gridSize - 1);
         const dpr = window.devicePixelRatio || 1;
         
         gridCanvas.width = totalSize * dpr;
@@ -464,8 +637,8 @@
         gCtx.clearRect(0,0,totalSize,totalSize);
 
         tiles.forEach((tile, i) => {
-            const col = i % currentGridSize;
-            const row = Math.floor(i / currentGridSize);
+            const col = i % gridSize;
+            const row = Math.floor(i / gridSize);
             const x = col * (tileSize + gap) + tileSize / 2;
             const y = row * (tileSize + gap) + tileSize / 2;
             drawShape(gCtx, tile.shape, x, y, tileSize * 0.85, tile.color, tile.dir);
@@ -497,78 +670,19 @@
             const cy = h/2;
             drawShape(tCtx, t.shape, cx, cy, size * 0.8, t.color, t.dir);
 
-            if (currentGridSize === 4) {
+            // 순서 뱃지
+            if (gameMode === 'infinite') {
                 drawBadge(tCtx, cx + size/3, cy - size/3, i + 1);
-            } else if (currentGridSize === 5) {
+            } else if (gameMode === 'survival') {
                 const orderNum = targetOrder.indexOf(i) + 1;
                 drawBadge(tCtx, cx + size/3, cy - size/3, orderNum);
             }
         });
     }
 
-    // --- 입력 핸들링 ---
-    gridCanvas.addEventListener('pointerdown', (e) => {
-        const rect = gridCanvas.getBoundingClientRect();
-        const tileSize = parseInt(gridCanvas.style.width) / currentGridSize;
-        const idx = Math.floor((e.clientY - rect.top) / tileSize) * currentGridSize + Math.floor((e.clientX - rect.left) / tileSize);
-        if(idx >= 0 && idx < tiles.length) handleTileClick(idx);
-    });
-
-    function handleTileClick(idx) {
-        if (selectedIndices.includes(idx)) return;
-
-        const tile = tiles[idx];
-        let isValidClick = false;
-
-        if (currentGridSize === 3) {
-            isValidClick = targets.some(t => t.id === tile.id);
-        } 
-        else {
-            const targetIdxToFind = targetOrder[currentStep];
-            const targetToFind = targets[targetIdxToFind];
-            if (targetToFind.id === tile.id) {
-                isValidClick = true;
-            } else {
-                isValidClick = false; 
-            }
-        }
-
-        if (isValidClick) {
-            if (selectedIndices.length === 0) startComboTimer();
-
-            selectedIndices.push(idx);
-            
-            if (currentGridSize >= 4) {
-                currentStep++;
-            }
-            
-            drawGrid();
-
-            if (selectedIndices.length === 3) {
-                stopComboTimer();
-                setTimeout(() => {
-                    if(navigator.vibrate) navigator.vibrate([50,50,50]);
-                    generateLevel();
-                }, 150);
-            }
-        } else {
-            gridCanvas.classList.remove('shake');
-            void gridCanvas.offsetWidth;
-            gridCanvas.classList.add('shake');
-            if(navigator.vibrate) navigator.vibrate(100);
-        }
-    }
-
-    function setDifficulty(size) {
-        currentGridSize = size;
-        if (size === 3) roundTimeLimit = 60;
-        else if (size === 4) roundTimeLimit = 40;
-        else if (size === 5) roundTimeLimit = 20;
-        generateLevel();
-    }
-
     window.addEventListener('resize', () => { drawGrid(); drawTargets(); });
-    setDifficulty(3);
+    // 초기 시작
+    setGameMode(3); 
 
 </script>
 </body>
